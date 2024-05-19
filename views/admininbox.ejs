@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Inbox</title>
+  <title>Admin Inbox</title>
   <!-- jquery cdn -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
 
@@ -280,10 +280,10 @@
         <div class="sidebar-sticky">
           <ul class="nav flex-column">
             <li class="nav-item">
-              <a class="nav-link active" href="/home"> Dashboard </a>
+              <a class="nav-link active" href="/admin"> Dashboard </a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="/inbox"> Message </a>
+              <a class="nav-link" href="/admin/inbox"> Message </a>
             </li>
           </ul>
         </div>
@@ -295,17 +295,44 @@
           <div class="container">
             <div class="row clearfix">
               <div class="col-lg-12">
-                <div class="card">
+                <div class="card chat-app" style="height: 542px;">
+                  <div id="plist" class="people-list">
+                    <div class="input-group">
+                      <div class="input-group-prepend">
+                        <span class="input-group-text"><i class="fa fa-search"></i></span>
+                      </div>
+                      <input type="text" class="form-control" placeholder="Search..." />
+                    </div>
+
+                    <!-- users list -->
+                    <ul class="list-unstyled chat-list mt-2 mb-0" style="overflow: hidden" id="users">
+                      <% for( let i = 0; i < users.length; i++ ) { %>
+                      <% if (!users[i].role) { %>
+                      <li class="clearfix user" data-id="<%= users[i].id %>">
+                        <img src="https://bootdey.com/img/Content/avatar/avatar1.png" alt="avatar" />
+                        <div class="about">
+                          <div class="name"><%= users[i].name %></div>
+                          <div class="status">
+                            <i class="fa fa-circle offline"></i> left 7 mins
+                            ago
+                          </div>
+                        </div>
+                      </li>
+                      <% } %>
+                      <% } %>
+                    </ul>
+                    <!-- users list end -->
+                  </div>
                   <div class="chat">
                     <div class="chat-header clearfix">
                       <div class="row">
-                        <div class="col-lg-6">
+                        <div class="col-lg-6" id="d-flex align-items-center">
                           <a href="javascript:void(0);" data-toggle="modal" data-target="#view_info">
                             <img src="https://bootdey.com/img/Content/avatar/avatar2.png" alt="avatar" />
                           </a>
                           <div class="chat-about">
-                            <h6 class="m-b-0">Aiden Chavez</h6>
-                            <small>Last seen: 2 hours ago</small>
+                            <h6 id="selected-user" class="m-b-0 mt-2">Aiden Chavez</h6>
+                            <!-- <small>Last seen: 2 hours ago</small> -->
                           </div>
                         </div>
                         <div class="col-lg-6 hidden-sm text-right">
@@ -316,45 +343,25 @@
                         </div>
                       </div>
                     </div>
-                    <div class="chat-history" id="messages" style="overflow: auto; height: 381px">
-                      <ul class="m-b-0">
-                        <!-- <li class="clearfix">
-                            <div class="message other-message float-right">
-                              Hi Aiden, how are you? How is the project coming
-                              along?
-                            </div>
-                          </li>
-                          <li class="clearfix">
-                            <div class="message-data">
-                              <span class="message-data-time"
-                                >10:12 AM, Today</span
-                              >
-                            </div>
-                            <div class="message my-message">
-                              Are we meeting today?
-                            </div>
-                          </li>
-                          <li class="clearfix">
-                            <div class="message-data">
-                              <span class="message-data-time"
-                                >10:15 AM, Today</span
-                              >
-                            </div>
-                            <div class="message my-message">
-                              Project has been already finished and I have
-                              results to show you.
-                            </div>
-                          </li> -->
-                      </ul>
+
+                    <!-- chat box start from here -->
+                    <div id="messages" class="chat-history" style="overflow: auto; height: 381px">
+
                     </div>
+                    <!-- chat box ends here -->
+
+                    <!-- message input -->
                     <div class="chat-message clearfix">
                       <form action="" method="post" class="input-group mb-0" id="form">
-                        <input type="text" class="form-control" placeholder="Enter text here..." id="input" />
+                        <!-- input field -->
+                        <input autocomplete="false" type="text" class="form-control" placeholder="Enter text here..." id="input"></input>
                         <button type="submit" class="input-group-prepend">
                           <span class="input-group-text" style="outline: none"><i class="fa fa-send"></i></span>
                         </button>
                       </form>
                     </div>
+                    <!-- message input ends -->
+
                   </div>
                 </div>
               </div>
@@ -376,73 +383,124 @@
     var form = document.getElementById("form");
     var input = document.getElementById("input");
 
+
+    $(document).ready(function() {
+      $('.chat-about').hide()
+    })
+
+    // sending message to user with user_id
     form.addEventListener("submit", function(e) {
       e.preventDefault();
-      const message = input.value;
+      if (user_id) {
+        if (input.value) {
+          const message = input.value;
+          // store message
+          $.ajax({
+            url: "/store-message",
+            type: "POST",
+            dataType: "JSON",
+            data: {
+              client_user_id: user_id,
+              message: message,
+              role: "admin"
+            },
+            success: function(res) {
+              if (res.error) {
+                alert('Something went wrong!')
+              }
+            }
+          })
 
-      // store message
-      $.ajax({
-        url: "/store-message",
-        type: "POST",
-        dataType: "JSON",
-        data: {
-          client_user_id: user_id,
-          message: message
-        },
-        success: function(res) {
-          if (res.error) {
-            alert("Something went wrong!")
-          }
+          // emit
+          socket.emit("admin-message", {
+            user_id_from_admin: user_id,
+            message,
+          });
+
+          // printing admin's own message
+          $('#messages').append(
+            `<li class="clearfix mb-2">
+              <div class="message other-message float-right">${message}</div>
+             </li>
+            `
+          )
+          messages.scrollTop = messages.scrollHeight;
+
+          input.value = "";
         }
-      })
-
-      if (input.value) {
-
-        // emit message
-        socket.emit("client-message", {
-          user_id_from_client: user_id,
-          message,
-        });
-
-        // printing client's own message
-        $('#messages').append(
-          `<li class="clearfix">
-            <div class="message other-message float-right">${message}</div>
-          </li>
-        `
-        )
-        messages.scrollTop = messages.scrollHeight;
-
-        input.value = "";
+      } else {
+        return false;
       }
-    });
+    }); //
 
-    // listen admin message
-    socket.on("admin-message", function({
-      user_id_from_admin,
+    // listen clients message
+    socket.on("client-message", function({
+      user_id_from_client,
       message
     }) {
-      if (user_id == user_id_from_admin) {
+      if (user_id == user_id_from_client) {
         $('#messages').append(
-          ` <li class="clearfix">
+          ` <li class="clearfix mb-2">
               <div class="message my-message">${message}</div>
             </li>
-        `
+          `
         )
         messages.scrollTop = messages.scrollHeight;
       }
     });
 
-    // get user_id
-    $(document).ready(function() {
+    $(".user").click(function() {
+      user_id = $(this).data("id");
+      $('#messages').html('')
+      $('.chat-about').show()
+      const userName = this.children[1].children[0].childNodes[0].data
+
+      $('#selected-user').text(userName)
       $.ajax({
-        url: "/get_user_id",
+        url: "/get-old-chat",
         dataType: "JSON",
-        success: function(res) {
-          user_id = res[0].id;
-          console.log(user_id);
+        data: {
+          client_user_id: user_id
         },
-      });
+        success: function(res) {
+          const old_chats = res.result;
+          old_chats.forEach((element) => {
+            if (element.role == "admin") {
+              $('#messages').append(
+                ` <li class="clearfix mb-2">
+                    <div class="message other-message float-right">${element.message}</div>
+                  </li>
+              `
+              )
+            } else {
+              $('#messages').append(
+                ` <li class="clearfix mb-2">
+                    <div class="message my-message">${element.message}</div>
+                  </li>
+              `
+              )
+            }
+            messages.scrollTop = messages.scrollHeight;
+          });
+        }
+      })
+    })
+
+
+    // input field customize
+    $('#input').val($.trim($('#input').val()))
+
+    $('#input').on('input', function(event) {
+      // $(this).css('height', '48px'); // Reset height to auto
+      $(this).css('height', $(this)[0].scrollHeight + 'px'); // Set height to scroll height
+      $(this).scrollTop($(this)[0].scrollHeight); // Scroll to the bottom
+    });
+
+    $('#input').on('keydown', function(event) {
+      if (event.which == 13 && !event.shiftKey) { // If Enter key is pressed without Shift
+        // event.preventDefault(); // Prevent default Enter behavior (adding a new line)
+        // $('#form').submit();
+      }
     });
   </script>
 </body>

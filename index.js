@@ -8,7 +8,7 @@ const { Server } = require("socket.io");
 const io = new Server(server);
 const path = require('path');
 const bodyParser = require('body-parser');
-const { log } = require('console');
+const ejs = require("ejs");
 
 
 // database connection
@@ -35,6 +35,7 @@ app.use(session({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.set('view engine', 'ejs');
 // app.use(express.static(path.join(__dirname, 'static')));
 
 
@@ -43,6 +44,8 @@ app.get('/', function (request, response) {
     response.sendFile(path.join(__dirname + '/login.html'));
 });
 
+
+// authentication
 app.post('/auth', function (request, response) {
     let email = request.body.email;
     let password = request.body.password;
@@ -70,6 +73,8 @@ app.post('/auth', function (request, response) {
     }
 });
 
+
+// load user's dashboard
 app.get('/home', function (request, response) {
     if (request.session.userloggedin) {
         response.sendFile(path.join(__dirname + '/index.html'));
@@ -78,13 +83,7 @@ app.get('/home', function (request, response) {
     }
 });
 
-// get all the user for admin
-app.get('/users', (req, res) => {
-    connection.query('SELECT * FROM users_table', (error, results) => {
-        if (error) throw error;
-        res.json(results);
-    });
-});
+
 
 // get user_id for logged in user
 app.get('/get_user_id', (request, response) => {
@@ -94,6 +93,7 @@ app.get('/get_user_id', (request, response) => {
     });
 })
 
+// load user's inbox page
 app.get('/inbox', function (request, response) {
     if (request.session.userloggedin) {
         response.sendFile(path.join(__dirname + '/inbox.html'));
@@ -102,6 +102,8 @@ app.get('/inbox', function (request, response) {
     }
 })
 
+
+// load admin dashboard
 app.get('/admin', function (request, response) {
     if (request.session.adminloggedin) {
         response.sendFile(path.join(__dirname + '/adminDashboard.html'));
@@ -110,12 +112,36 @@ app.get('/admin', function (request, response) {
     }
 });
 
+
+// load admin inbox page
 app.get('/admin/inbox', function (request, response) {
     if (request.session.adminloggedin) {
-        response.sendFile(path.join(__dirname + '/admininbox.html'));
+        // response.sendFile(path.join(__dirname + '/admininbox.html'));
+        connection.query('SELECT * FROM users_table', (error, results) => {
+            if (error) throw error;
+            response.render("admininbox", { users: results });
+        });
     } else {
         response.send('Please login as admin to view this page!');
     }
+})
+
+// store admins message
+app.post("/store-message", (req, res) => {
+    const user_id = req.body.client_user_id;
+    const message = req.body.message;
+    const role = req.body.role;
+    connection.query(`INSERT INTO messages (message, user_id, role, created_at) VALUES ('${message}', '${user_id}', '${role}', UNIX_TIMESTAMP(${Date.now()}))`, function (error, result) {
+        res.json({ error, result })
+    })
+});
+
+// load old message
+app.get("/get-old-chat", (req, res) => {
+    const user_id = req.query.client_user_id;
+    connection.query(`SELECT * FROM messages WHERE user_id=${user_id}`, function (error, result) {
+        res.json({ error, result })
+    })
 })
 
 // socket
@@ -128,6 +154,9 @@ io.on('connection', (socket) => {
     })
 });
 
-server.listen(3000, () => {
+
+const ip = "192.168.5.240";
+const port = 3000
+server.listen(port, ip, () => {
     console.log('listening on *:3000');
 });
